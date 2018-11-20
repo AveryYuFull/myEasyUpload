@@ -89,7 +89,7 @@
 
 .easy_upload_queue_item .easy_upload_progress-box .easy_upload_progress .easy_upload_bar {
   height: 100%;
-  background: red;
+  background: orangered;
   width: 5%;
 }
 
@@ -97,6 +97,14 @@
 .easy_upload_queue_item .easy_upload_status, 
 .easy_upload_queue_item .easy_upload_btnBox .btn {
   margin-top: 5px;
+}
+
+.easy_upload_queue_item .easy_upload_status .status {
+  display: none;
+}
+
+.easy_upload_queue_item .easy_upload_status .status1 {
+  display: block;
 }
 
 .easy_upload_queue_item .easy_upload_size-box:first-child, 

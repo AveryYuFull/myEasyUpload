@@ -88,6 +88,17 @@
       // 是否允许上传新的文件
       let allowNewPost = true;
 
+      // 上传
+      let response = {};
+      response.success = [];
+      response.error = [];
+
+      // 进度条
+      let loadedPercent = 0;
+      let incresePercent = 1;
+      let showTimer = null;
+      let uploadCompleted = false;
+
       let upFinished = true;
 
       let easyManager = {
@@ -154,18 +165,67 @@
               }
             }
           });
+          $('.easy_upload-head-deleteBtn').off('click').click(function () {
+            let queueUl = $(this).parent().parent().find('.easy_upload-queue');
+            if (queueUl) {
+              let _arr = _that.findItems(2, queueUl);
+              if (_arr && _arr.length > 0) {
+                _that.deleteFiles(_arr, queueUl);
+              }
+            }
+          });
+        },
+        deleteFiles (arr, target) {
+          const _that = this;
+          if (!arr || arr.length <= 0 || !target) {
+            return;
+          }
+
+          function dele (item) {
+            response.success.forEach((item1, index1) => {
+              if (item1.easyFileIndex === item) {
+                response.success.splice(index1, 1);
+              }
+            });
+            response.error.forEach((item2, index2) => {
+              if (item2.easyFileIndex === item) {
+                response.error.splice(index2, 1);
+              }
+            });
+          }
+
+          function deleteAllowFiles (itm) {
+            allowFiles = allowFiles.filter(item => {
+              return item.easyFileIndex !== itm;
+            })
+          }
+
+          arr.forEach(item => {
+            $(target).find('.easy_upload_queue_item[data-index="' + item + '"]').hide();
+            if (opts.multi) {
+              dele(item);
+            }
+            let qItem = _that.findEle(target, item);
+            if (qItem.upStatus === '2') {
+              deleteAllowFiles(item);
+            }
+          });
+          opts.deleteFunc && opts.deleteFunc(response);
         },
         uploadFile(target) {
           const _that = this;
           if (!target) {
             return;
           }
-          
+
           _that.setStatus2(target);
 
           function controlUp () {
-            if (postNums > allowFiles.length) {
+            if (postNums >= allowFiles.length) {
               upFinished = true;
+            } else {
+              upFinished = false;
+              upload();
             }
           }
 
@@ -173,8 +233,132 @@
             if (allowNewPost) {
               allowNewPost  = false;
 
+              let file = selectedFiles[allowFiles[postNums]];
+              postNums++;
+              _that.resetParams();
+
+              let params = new FormData();
+              params.append(opts.fileName, file);
+              if (opts.formParam) {
+                for (let key in opts.formParam) {
+                  params.append(key, opts.formParam[key]);
+                }
+              }
+
+              _that.setUpStatus({index: file.index, target: target}, 1);
+              _that.showProgress(file.index, target);
+              $.ajax({
+                url: opts.url,
+                type: 'POST',
+                data: params,
+                processData: false,
+                contentType: false,
+                timeout: opts.timeout,
+                success: function (res) {
+                  res.easyFileIndex = file.index;
+                  let qItem = _that.findEle(target, file.index);
+                  if (res.code !== opts.okCode) { // 上传失败
+                    allowNewPost = true;
+                    if (opts.multi) {
+                      response.error.push(res);
+                      opts.errorFunc && opts.errorFunc(response);
+                    } else {
+                      opts.errorFunc && opts.errorFunc(res);
+                    }
+                    _that.handleFailed(qItem);
+                  } else { // 上传成功
+                    if (opts.multi) {
+                      response.success.push(res);
+                      opts.successFunc && opts.successFunc(response);
+                    } else {
+                      opts.successFunc && opts.successFunc(res);
+                    }
+                  }
+                  controlUp();
+                },
+                error: function (res) {
+                  allowNewPost = true;
+                  res.easyFileIndex = file.index;
+                  let qItem = _that.findEle(target, file.index);
+                  if (opts.multi) {
+                    response.error.push(res);
+                    opts.errorFunc && opts.errorFunc(response);
+                  } else {
+                    opts.errorFunc && opts.errorFunc(res);
+                  }
+                  _that.handleFailed(qItem);
+                  controlUp();
+                }
+              })
             }
           }
+
+          if (upFinished) {
+            upload();
+          }
+        },
+        handleFailed (qItem) {
+          if (qItem) {
+            $(qItem.upBar).css('background', 'red');
+            $(qItem.statusDiv).find('.status').hide().end().find('.status4').show();
+            $(qItem.ele).find('.easy_upload_queue_check').attr('data-up', 4);
+          }
+        },
+        showProgress (index, target) {
+          const _that = this;
+          let qItem = _that.findEle(target, index);
+          if (qItem) {
+            const upBar = qItem.upBar;
+            const upPercent = qItem.upPercent;
+            const statusDiv = qItem.statusDiv;
+            const percentBoundary = Math.floor(Math.random() * 10) + 75;
+
+            showTimer = setInterval(() => {
+              if (loadedPercent < 100) {
+                if (!uploadCompleted && loadedPercent > percentBoundary) {
+                  incresePercent = 0;
+                } else {
+                  incresePercent = 1;
+                }
+
+                loadedPercent += incresePercent;
+                $(upBar).attr('width', loadedPercent + '%');
+                $(upPercent).text(loadedPercent + '%');
+              } else {
+                $(upBar).attr('width', '100%');
+                $(upPercent).text('100%');
+                $(statusDiv).find('.status').hide().end().find('.status5').show();
+                $(qItem).find('.easy_upload_queue_check').attr('data-up', 5);
+                clearTimeout(showTimer);
+                showTimer = null;
+                upFinished = true;
+                allowNewPost = true;
+                if (postNums < allowFiles.length) {
+                  _that.uploadFile(target);
+                }
+              }
+            }, 10);
+          }
+        },
+        setUpStatus (options, type) {
+          const _that = this;
+          const target = options.target;
+          const index = options.index;
+          let _qItem = _that.findEle(target, index);
+          const _ele = _qItem.ele;
+          if (type === 1) {
+            $(_ele).find('.easy_upload_queue_check').attr('data-up', 3);
+            $(_ele).find('.easy_upload_status').find('.status').hide().end().find('.status3').show();
+          } else {
+            $(_ele).find('.easy_upload_queue_check').attr('data-up', 4);
+            $(_ele).find('.easy_upload_status').find('.status').hide().end().find('.status4').show();
+          }
+        },
+        resetParams () {
+          loadedPercent = 0;
+          incresePercent = 1;
+          showTimer = null;
+          uploadCompleted = false;
         },
         setStatus2(target) {
           const _that = this;
@@ -219,7 +403,7 @@
             if (type === 1) {
               _qItem = $(target).find('.queue_check_true[data-check="yes"][data-up="1"]:visible');
             } else {
-              _qItem = $(target).find('.easy_upload_queue_check[data-up="1"][data-check="yes"]:visible .easy_upload_queue_check[data-up="2"][data-check="yes"]:visible .easy_upload_queue_check[data-up="4"][data-check="yes"]:visible');
+              _qItem = $(target).find('.easy_upload_queue_check[data-up="1"][data-check="yes"]:visible, .easy_upload_queue_check[data-up="2"][data-check="yes"]:visible, .easy_upload_queue_check[data-up="4"][data-check="yes"]:visible');
             }
             if (_qItem) {
               for (let i = 0; i < _qItem.length; i++) {
