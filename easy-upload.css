@@ -124,3 +124,7 @@
   user-select: none;
   cursor: pointer;
 }
+
+.easy_upload_queue_check {
+  cursor: pointer;
+}

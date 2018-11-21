@@ -175,6 +175,49 @@
             }
           });
         },
+        bindQueue () {
+          const _that = this;
+          $('.easy_upload_queue_check').off('click').click(function () {
+            let _checked = $(this).attr('data-check');
+            let opts = {type: 'notAll', target: this};
+            if (_checked === 'yes') {
+              opts.checked = 'no';
+            } else {
+              opts.checked = 'yes';
+            }
+            _that.handleCheck(opts);
+            let _checkedAll = _that.countCheck(this);
+            if (_checkedAll) {
+              $(this).parent().parent().parent().find('.easy_upload-head-check').html('&#xe61e').attr('data-check', 'yes');
+            } else {
+              $(this).parent().parent().parent().find('.easy_upload-head-check').html('&#xe693').attr('data-check', 'no');
+            }
+          });
+          $('.easy_upload-btn').off('click').click(function () {
+            let _dataIndex = $(this).parent().parent().attr('data-index');
+            allowFiles.push(_dataIndex);
+            let queueUl = $(this).parent().parent().parent();
+            _that.uploadFile(queueUl);
+          });
+          $('.easy_delete_btn').off('click').click(function () {
+            let _upStatus = $(this).parent().parent().find('.easy_upload_queue_check').attr('data-up');
+            if (_upStatus !== '3') {
+              let _index = $(this).parent().parent().attr('data-index');
+              let _queueUl = $(this).parent().parent().parent();
+              _that.deleteFiles([_index], _queueUl);
+            }
+          });
+        },
+        countCheck (target) {
+          if (!target) {
+            return;
+          }
+
+          let qItem = $(target).parent().parent().find('.easy_upload_queue_check');
+          return [].slice.apply(qItem).every(ele => {
+            return $(ele).attr('data-check') === 'yes';
+          });
+        },
         deleteFiles (arr, target) {
           const _that = this;
           if (!arr || arr.length <= 0 || !target) {
@@ -505,7 +548,7 @@
               $html += '<div class="easy_upload_size">' + F.formatFileSize(_file.size) + '</div>';
               $html += '<div class="easy_upload_percent">0%</div>';
               $html += '</div>' // size-box
-              $html += '<div class="easy_upload_status">' + (file.allow ? sHtml : '<div class="status status6">文件不合法</div>') + '</div>';
+              $html += '<div class="easy_upload_status">' + (file.allow ? sHtml : '<div class="status6">文件不合法</div>') + '</div>';
               $html += '<div class="easy_upload_btnBox">';
               $html += file.allow ? '<div class="easy_upload-btn btn">上传</div>' : ' ';
               $html += '<div class="easy_delete_btn btn">删除</div>';
@@ -530,6 +573,8 @@
               let $html = generateHtml(fileArray[0]);
               $(queueUi).append($html);
             }
+
+            this.bindQueue();
           }
         }
       };
